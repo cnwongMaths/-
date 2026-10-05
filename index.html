@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>霓虹代數戰機 — 多項式特訓</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{width:100%;height:100%;overflow:hidden;background:#05060f;font-family:"Segoe UI","Microsoft JhengHei",sans-serif;color:#dfe9ff}
+  canvas{display:block;touch-action:none}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(5,6,15,.88);backdrop-filter:blur(6px);z-index:10;padding:20px;text-align:center}
+  .hidden{display:none!important}
+  h1{font-size:clamp(26px,6vw,46px);color:#19e8ff;text-shadow:0 0 18px #19e8ff,0 0 50px #0af;letter-spacing:2px}
+  .sub{color:#ff4fd8;text-shadow:0 0 12px #ff4fd8;margin:8px 0 18px;font-size:clamp(13px,3vw,17px)}
+  .topics{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:560px;margin-bottom:20px}
+  .topic-btn{padding:10px 16px;border:2px solid #2a3a6a;border-radius:10px;background:#0c1226;color:#9fb4e8;
+    font-size:15px;cursor:pointer;transition:.15s}
+  .topic-btn:hover{border-color:#19e8ff;color:#fff}
+  .topic-btn.sel{border-color:#ff4fd8;color:#fff;background:#22102b;box-shadow:0 0 14px #ff4fd888}
+  .big-btn{padding:14px 46px;font-size:20px;font-weight:bold;border:none;border-radius:12px;cursor:pointer;
+    background:linear-gradient(135deg,#19e8ff,#7a5cff);color:#04121a;box-shadow:0 0 24px #19e8ff99;transition:.15s}
+  .big-btn:hover{transform:scale(1.05)}
+  .hint{margin-top:14px;font-size:13px;color:#7d8fc0;line-height:1.7;max-width:520px}
+  .stat{font-size:17px;margin:5px 0;color:#bfe3ff}
+  .stat b{color:#ffe14f;text-shadow:0 0 10px #ffe14f}
+  #results h2{font-size:30px;color:#7dff9a;text-shadow:0 0 16px #7dff9a;margin-bottom:12px}
+  .row{display:flex;gap:14px;margin-top:20px}
+  /* 觸控按鈕 */
+  #touchUI{position:fixed;right:10px;bottom:14px;display:none;flex-direction:column;gap:10px;z-index:5}
+  .tbtn{width:70px;height:70px;border-radius:50%;border:2px solid #19e8ff;background:rgba(10,20,40,.65);
+    color:#19e8ff;font-size:14px;font-weight:bold;user-select:none;touch-action:none;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px #19e8ff66}
+  .tbtn:active{background:rgba(25,232,255,.3)}
+  #btnPause{position:fixed;left:10px;bottom:14px;width:54px;height:54px;font-size:20px;display:none}
+  @media (pointer:coarse){#touchUI,#btnPause{display:flex}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- 觸控按鈕 -->
+<div id="touchUI">
+  <div class="tbtn" id="btnBoost">⚡<br>加速</div>
+  <div class="tbtn" id="btnFire">🔥<br>開火</div>
+</div>
+<div class="tbtn" id="btnPause">⏸</div>
+
+<!-- 主選單 -->
+<div class="overlay" id="menu">
+  <h1>霓虹代數戰機</h1>
+  <div class="sub">多項式運算 × 因式分解｜3 分鐘限時特訓</div>
+  <div class="topics" id="topicList">
+    <button class="topic-btn sel" data-t="mixed">🎲 混合特訓</button>
+    <button class="topic-btn" data-t="mul">✖️ 多項式乘法</button>
+    <button class="topic-btn" data-t="fac">🧩 因式分解</button>
+    <button class="topic-btn" data-t="add">➕ 多項式加減</button>
+    <button class="topic-btn" data-t="exp">🔢 指數定律</button>
+  </div>
+  <button class="big-btn" id="startBtn">開始特訓 🚀</button>
+  <div class="hint">
+    ⌨️ 電腦：← → 或 A/D 移動｜空白鍵開火｜Shift 加速｜P 暫停（滑鼠移動＋按住開火都得）<br>
+    📱 手機：拖動畫面轉向，右下「開火／加速」按鈕<br>
+    🎯 射中正確答案得分（連擊加分 100→120→140…）｜射錯系統離線 2 秒、連擊歸零｜撞樓墜毀重生！<br>
+    ⚠️ 小心 4 架無人機入面有「相似陷阱答案」！
+  </div>
+</div>
+
+<!-- 結算 -->
+<div class="overlay hidden" id="results">
+  <h2>特訓完成！</h2>
+  <div class="stat">總分：<b id="rScore">0</b></div>
+  <div class="stat">答對：<b id="rOk">0</b> 題｜答錯：<b id="rNo">0</b> 題</div>
+  <div class="stat">準確率：<b id="rAcc">—</b></div>
+  <div class="stat">最佳連擊：<b id="rCombo">0</b></div>
+  <div class="row">
+    <button class="big-btn" id="againBtn">再玩一次 🔄</button>
+    <button class="big-btn" id="menuBtn" style="background:linear-gradient(135deg,#ff4fd8,#ff9a3d)">主選單 🏠</button>
+  </div>
+</div>
+
+<!-- 暫停 -->
+<div class="overlay hidden" id="pause">
+  <h2 style="color:#19e8ff;text-shadow:0 0 14px #19e8ff">已暫停</h2>
+  <div class="row"><button class="big-btn" id="resumeBtn">繼續 ▶</button>
+  <button class="big-btn" id="quitBtn" style="background:linear-gradient(135deg,#ff4fd8,#ff9a3d)">放棄 🏠</button></div>
+</div>
+
+<script>
+"use strict";
+/* ================= 基本設定 ================= */
+const cv=document.getElementById('game'),ctx=cv.getContext('2d');
+let W,H,DPR;
+const $=id=>document.getElementById(id);
+
+/* ================= 數學格式化 ================= */
+const SUP={'-':'⁻','0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+const sup=n=>String(n).split('').map(c=>SUP[c]).join('');
+const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const pick=a=>a[rnd(0,a.length-1)];
+const sg=s=>s<0?-1:1;
+function linStr(a,b){ // ax+b
+  if(a===0)return String(b);
+  let s=(a===1?'x':a===-1?'−x':a+'x');
+  if(b>0)s+=' + '+b;else if(b<0)s+=' − '+(-b);
+  return s;
+}
+function quadStr(b,c){ // x²+bx+c
+  let s='x²';
+  if(b!==0)s+=(b>0?' + ':' − ')+(Math.abs(b)===1?'x':Math.abs(b)+'x');
+  if(c!==0)s+=(c>0?' + ':' − ')+Math.abs(c);
+  return s;
+}
+
+/* ================= 題目生成（簡易版 + 相似誘答） ================= */
+const gens={
+exp(){ // 指數定律
+  const t=rnd(1,3);
+  if(t===1){const m=rnd(2,4),n=rnd(2,4);
+    return{prefix:'化簡',q:`x${sup(m)} × x${sup(n)}`,correct:'x'+sup(m+n),
+      traps:['x'+sup(m*n),'x'+sup(m+n+1),'x'+sup(m+n-1)]};}
+  if(t===2){const m=rnd(5,9),n=rnd(2,4),e=m-n;
+    return{prefix:'化簡',q:`x${sup(m)} ÷ x${sup(n)}`,correct:'x'+sup(e),
+      traps:['x'+sup(e+1),(e-1>=1?'x'+sup(e-1):'x'+sup(e+2)),(m%n===0?'x'+sup(m/n):'x'+sup(m+n))]};}
+  const m=rnd(2,4),n=rnd(2,3);
+  return{prefix:'化簡',q:`(x${sup(m)})${sup(n)}`,correct:'x'+sup(m*n),
+    traps:['x'+sup(m+n),'x'+sup(m*n+1),'x'+sup(m*n-1)]};
+},
+add(){ // 多項式加減
+  const a=rnd(2,6),c=rnd(1,5);let b,d,op;
+  do{b=rnd(-6,6);}while(b===0);
+  do{d=rnd(-6,6);}while(d===0);
+  op=pick(['+','−']);
+  const q=`(${linStr(a,b)}) ${op} (${linStr(c,d)})`;
+  if(op==='+'){
+    const bd=b+d;
+    const xsq=(a+c)+'x²'+(bd>0?' + '+bd:bd<0?' − '+(-bd):'');
+    return{prefix:'化簡',q,correct:linStr(a+c,b+d),
+      traps:[linStr(a-c,b+d),linStr(a+c,b-d),xsq]};
+  }
+  return{prefix:'化簡',q,correct:linStr(a-c,b-d),
+    traps:[linStr(a-c,b+d),   // 忘記變號（相似陷阱）
+           linStr(a+c,b-d),linStr(a+c,b+d)]};
+},
+mul(){ // 多項式乘法
+  const t=rnd(1,3);
+  if(t===1){const k=rnd(2,4),a=rnd(1,3);let b;do{b=rnd(-5,5);}while(b===0);
+    return{prefix:'展開',q:`${k}(${linStr(a,b)})`,correct:linStr(k*a,k*b),
+      traps:[linStr(k*a,b),linStr(a,k*b),linStr(k*a,-k*b)]};}
+  if(t===2){let a,b;do{a=rnd(-5,5);}while(a===0);do{b=rnd(-5,5);}while(b===0||a+b===0);
+    return{prefix:'展開',q:`(${linStr(1,a)})(${linStr(1,b)})`,correct:quadStr(a+b,a*b),
+      traps:[quadStr(0,a*b),       // 漏中項（相似陷阱）
+             quadStr(a+b,-a*b),quadStr(a*b,a+b)]};}
+  let a;do{a=rnd(-5,5);}while(a===0);
+  return{prefix:'展開',q:`(${linStr(1,a)})²`,correct:quadStr(2*a,a*a),
+    traps:[quadStr(0,a*a),          // (x+a)² = x²+a² 經典錯誤（相似陷阱）
+           quadStr(a,a*a),quadStr(-2*a,a*a)]};
+},
+fac(){ // 因式分解
+  const t=rnd(1,4);
+  if(t===1){const k=pick([4,6]);let a,b;
+    do{a=rnd(1,3);b=rnd(1,5);}while(gcd(a,b)!==1);
+    const k2=(k===4?2:pick([2,3]));
+    return{prefix:'因式分解',q:quadStr(k*a,k*b),correct:`${k}x(${linStr(a,b)})`,
+      traps:[`${k2}x(${linStr(k/k2*a,k/k2*b)})`,  // 未提盡公因式（相似陷阱）
+             `${k}(${linStr(a,b)})`,`${k}x(${linStr(a,-b)})`]};}
+  if(t===2){const a=rnd(2,6);
+    return{prefix:'因式分解',q:`x² − ${a*a}`,correct:`(x + ${a})(x − ${a})`,
+      traps:[`(x − ${a})²`,`(x + ${a})²`,`(x + ${a})(${a} − x)`]};}
+  if(t===3){const a=rnd(1,5);
+    return{prefix:'因式分解',q:quadStr(2*a,a*a),correct:`(x + ${a})²`,
+      traps:[`(x − ${a})²`,`(x + ${a})(x − ${a})`,`(x + 1)(x + ${a*a})`]};}
+  let a,b;do{a=rnd(1,6);b=rnd(1,6);}while(a===b);
+  if(Math.random()<0.5)
+    return{prefix:'因式分解',q:quadStr(a+b,a*b),correct:`(x + ${a})(x + ${b})`,
+      traps:[`(x − ${a})(x − ${b})`,`(x + ${a})(x − ${b})`,`(x + 1)(x + ${a*b})`]};
+  return{prefix:'因式分解',q:quadStr(-(a+b),a*b),correct:`(x − ${a})(x − ${b})`,
+    traps:[`(x + ${a})(x + ${b})`,`(x − ${a})(x + ${b})`,`(x − 1)(x − ${a*b})`]};
+}
+};
+function gcd(a,b){return b?gcd(b,a%b):a;}
+function genQuestion(topic){
+  for(let i=0;i<100;i++){
+    const g=topic==='mixed'?pick(Object.values(gens)):gens[topic];
+    const r=g(),opts=[r.correct,...r.traps];
+    if(new Set(opts).size===4){
+      const idx=[0,1,2,3].sort(()=>Math.random()-.5);
+      return{prefix:r.prefix,q:r.q,options:idx.map(j=>opts[j]),ans:idx.indexOf(0)};
+    }
+  }
+  return{prefix:'化簡',q:'x² × x³',options:['x⁵','x⁶','x⁴','x⁹'],ans:0};
+}
+
+/* ================= 音效 ================= */
+let AC=null;
+function beep(f,d,type,g){try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();
+  const o=AC.createOscillator(),gn=AC.createGain();o.type=type||'square';o.frequency.value=f;
+  gn.gain.setValueAtTime(g||0.05,AC.currentTime);gn.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+d);
+  o.connect(gn).connect(AC.destination);o.start();o.stop(AC.currentTime+d);}catch(e){}}
+const sndOK=()=>{beep(620,.1);setTimeout(()=>beep(930,.14),70);};
+const sndNo=()=>beep(130,.45,'sawtooth',.07);
+const sndBoom=()=>beep(70,.5,'sawtooth',.09);
+const sndFire=()=>beep(980,.05,'square',.02);
+
+/* ================= 遊戲狀態 ================= */
+let state='menu',topic='mixed';
+let gtime=0,timeLeft=180,score=0,combo=0,bestCombo=0,nOK=0,nNO=0;
+let offlineUntil=0,waveTimer=0,current=null,drones=[];
+let shots=[],parts=[],floats=[],rain=[];
+let scrollY=0,boost=false,fireCd=0,firing=false,touchTarget=null,mouseX=null;
+const keys={};
+const ship={x:0,y:0,r:14,deadUntil:0,invUntil:0};
+
+/* ================= 城市峽谷 ================= */
+const SEG=90;let wallSegs=[],segCounter=0;
+const hash=n=>{const x=Math.sin(n*12.9898)*43758.5453;return x-Math.floor(x);};
+function pushSeg(){segCounter++;wallSegs.push({l:24+hash(segCounter*2)*Math.min(80,W*0.2),
+  r:24+hash(segCounter*2+1)*Math.min(80,W*0.2)});}
+function buildWalls(){wallSegs=[];segCounter=0;for(let i=0;i<Math.ceil(H/SEG)+4;i++)pushSeg();}
+function wallAt(y,side){const t=(y+scrollY)/SEG,i=Math.floor(t),f=t-i;
+  const a=wallSegs[i%wallSegs.length][side],b=wallSegs[(i+1)%wallSegs.length][side];
+  return a+(b-a)*f;}
+function initRain(){rain=[];for(let i=0;i<90;i++)rain.push({x:Math.random()*W,y:Math.random()*H,v:500+Math.random()*400,l:10+Math.random()*16});}
+
+/* ================= 尺寸 ================= */
+function resize(){W=innerWidth;H=innerHeight;DPR=Math.min(devicePixelRatio||1,2);
+  cv.width=W*DPR;cv.height=H*DPR;cv.style.width=W+'px';cv.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);buildWalls();initRain();
+  ship.y=H-Math.max(110,H*0.14);}
+addEventListener('resize',resize);resize();
+
+/* ================= 無人機 ================= */
+function spawnWave(){
+  current=genQuestion(topic);
+  drones=current.options.map((opt,i)=>({text:opt,correct:i===current.ans,
+    x:W*(0.16+0.227*i),y:150+(i%2)*46,t:Math.random()*6,alive:true,leaving:false,flash:0,vy:0}));
+}
+
+/* ================= 開火 / 命中 ================= */
+function fire(){shots.push({x:ship.x,y:ship.y-22,v:-760});sndFire();}
+function explode(x,y,color,n){for(let i=0;i<(n||26);i++){const a=Math.random()*Math.PI*2,s=60+Math.random()*260;
+  parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.6+Math.random()*.5,color});}}
+function onCorrect(d){
+  combo++;bestCombo=Math.max(bestCombo,combo);nOK++;
+  const pts=100+20*(combo-1);score+=pts;
+  floats.push({x:d.x,y:d.y,text:'+'+pts+(combo>1?'  連擊×'+combo:''),life:1.1,color:'#7dff9a'});
+  explode(d.x,d.y,'#7dff9a');sndOK();
+  drones.forEach(o=>{o.leaving=true;o.vy=-160-Math.random()*120;});
+  current=null;waveTimer=0.9;
+}
+function onWrong(d){
+  nNO++;combo=0;offlineUntil=gtime+2;d.flash=1;
+  floats.push({x:d.x,y:d.y,text:'✘ 系統離線！',life:1.2,color:'#ff5f6d'});
+  explode(d.x,d.y,'#ff5f6d',14);sndNo();
+}
+function crash(){
+  explode(ship.x,ship.y,'#ffb14f',40);sndBoom();
+  ship.deadUntil=gtime+1.2;ship.invUntil=gtime+3.2;ship.x=W/2;
+}
+
+/* ================= 主更新 ================= */
+function update(dt){
+  gtime+=dt;timeLeft-=dt;
+  if(timeLeft<=0){endGame();return;}
+  const spd=boost?270:145;scrollY+=spd*dt;
+  if(scrollY>=SEG){scrollY-=SEG;wallSegs.shift();pushSeg();}
+  const offline=gtime<offlineUntil,alive=gtime>=ship.deadUntil;
+
+  // 移動
+  if(alive&&!offline){
+    let dir=0;
+    if(keys['ArrowLeft']||keys['a']||keys['A'])dir-=1;
+    if(keys['ArrowRight']||keys['d']||keys['D'])dir+=1;
+    if(dir)ship.x+=dir*400*dt;
+    if(touchTarget!==null)ship.x+=(touchTarget-ship.x)*Math.min(1,dt*12);
+    else if(mouseX!==null)ship.x+=(mouseX-ship.x)*Math.min(1,dt*14);
+    ship.x=Math.max(6,Math.min(W-6,ship.x));
+    if(gtime>=ship.invUntil){
+      if(ship.x-ship.r<wallAt(ship.y,'l')||ship.x+ship.r>W-wallAt(ship.y,'r'))crash();
+    }
+  }
+  // 開火
+  fireCd-=dt;
+  if(firing&&fireCd<=0&&alive&&!offline){fire();fireCd=0.22;}
+  // 子彈
+  for(let i=shots.length-1;i>=0;i--){const s=shots[i];s.y+=s.v*dt;
+    if(s.y<-20){shots.splice(i,1);continue;}
+    for(const d of drones){if(!d.alive||d.leaving)continue;
+      const hw=Math.max(52,ctx.measureText(d.text).width/2+22);
+      if(Math.abs(s.x-d.x)<hw&&Math.abs(s.y-d.y)<26){
+        shots.splice(i,1);d.correct?(d.alive=false,onCorrect(d)):onWrong(d);break;}}}
+  // 無人機
+  for(let i=drones.length-1;i>=0;i--){const d=drones[i];d.t+=dt;d.flash=Math.max(0,d.flash-dt*2);
+    if(d.leaving){d.y+=d.vy*dt;if(d.y<-60)drones.splice(i,1);continue;}
+    d.y+=Math.sin(d.t*2)*6*dt*3;
+    const l=wallAt(d.y,'l')+58,r=W-wallAt(d.y,'r')-58;
+    d.x=Math.max(l,Math.min(r,d.x+Math.sin(d.t*.8)*10*dt));}
+  // 下一波
+  if(!current&&state==='playing'){waveTimer-=dt;if(waveTimer<=0)spawnWave();}
+  // 粒子 / 浮字 / 雨
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.life-=dt;
+    if(p.life<=0){parts.splice(i,1);continue;}p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=300*dt;}
+  for(let i=floats.length-1;i>=0;i--){const f=floats[i];f.life-=dt;f.y-=40*dt;
+    if(f.life<=0)floats.splice(i,1);}
+  for(const r of rain){r.y+=r.v*dt;if(r.y>H){r.y=-20;r.x=Math.random()*W;}}
+}
+
+/* ================= 繪圖 ================= */
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+function render(){
+  // 天空
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#0b0620');sky.addColorStop(.5,'#0a0f2a');sky.addColorStop(1,'#120a24');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  // 遠景剪影
+  ctx.fillStyle='#0e1430';
+  for(let i=0;i<14;i++){const bw=W/14,off=(scrollY*.25+i*160)%(H+240)-240;
+    ctx.fillRect(i*bw+4,off,bw-8,220);}
+  // 左右樓宇
+  for(const side of['l','r']){
+    ctx.beginPath();
+    if(side==='l'){ctx.moveTo(0,0);for(let y=0;y<=H;y+=12)ctx.lineTo(wallAt(y,'l'),y);ctx.lineTo(0,H);}
+    else{ctx.moveTo(W,0);for(let y=0;y<=H;y+=12)ctx.lineTo(W-wallAt(y,'r'),y);ctx.lineTo(W,H);}
+    ctx.closePath();ctx.fillStyle='#0a0d1c';ctx.fill();
+    ctx.strokeStyle=side==='l'?'#19e8ff':'#ff4fd8';ctx.lineWidth=2;
+    ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=12;ctx.stroke();ctx.shadowBlur=0;
+    // 窗戶
+    for(let y=0;y<H;y+=30){
+      const w=wallAt(y,side),rowKey=Math.floor((y+scrollY)/30);
+      for(let x=10;x<w-12;x+=16){
+        if(hash(rowKey*57+x*13+(side==='l'?1:2))<0.32){
+          ctx.fillStyle=pick2(hash(rowKey+x),['#ffe14f','#19e8ff','#ff4fd8','#7dff9a']);
+          ctx.globalAlpha=.55;ctx.fillRect(side==='l'?x:W-w+x,y+6,7,10);ctx.globalAlpha=1;}}}
+  }
+  // 雨
+  ctx.strokeStyle='rgba(140,190,255,.35)';ctx.lineWidth=1;ctx.beginPath();
+  for(const r of rain){ctx.moveTo(r.x,r.y);ctx.lineTo(r.x-2,r.y+r.l);}ctx.stroke();
+
+  if(state==='menu')return;
+
+  // 題目
+  ctx.textAlign='center';
+  const qsize=W<500?16:21;
+  ctx.font='bold '+qsize+'px "Segoe UI","Microsoft JhengHei",sans-serif';
+  ctx.fillStyle='#ffe14f';ctx.shadowColor='#ffe14f';ctx.shadowBlur=14;
+  ctx.fillText(current?`${current.prefix}：${current.q}`:'✓ 正確！準備下一題…',W/2,52);
+  ctx.shadowBlur=0;
+
+  // 無人機
+  const fs=W<500?13:16;
+  for(const d of drones){
+    ctx.font='bold '+fs+'px "Segoe UI","Microsoft JhengHei",sans-serif';
+    const tw=ctx.measureText(d.text).width,bw=Math.max(64,tw+36),bh=38;
+    const bob=Math.sin(d.t*2)*4,x=d.x-bw/2,y=d.y-bh/2+bob;
+    // 旋翼
+    ctx.strokeStyle='rgba(160,220,255,.7)';ctx.lineWidth=2;ctx.beginPath();
+    ctx.moveTo(d.x-14,y-10+Math.sin(d.t*30)*2);ctx.lineTo(d.x-26,y-14);
+    ctx.moveTo(d.x+14,y-10+Math.cos(d.t*30)*2);ctx.lineTo(d.x+26,y-14);ctx.stroke();
+    ctx.shadowColor=d.flash>0?'#ff5f6d':'#b46bff';ctx.shadowBlur=14;
+    ctx.fillStyle=d.flash>0?'rgba(80,10,20,.92)':'rgba(24,12,48,.92)';
+    rr(x,y,bw,bh,10);ctx.fill();
+    ctx.strokeStyle=d.flash>0?'#ff5f6d':'#b46bff';ctx.lineWidth=2;ctx.stroke();ctx.shadowBlur=0;
+    ctx.fillStyle='#fff';ctx.fillText(d.text,d.x,d.y+5+bob);
+  }
+  // 子彈
+  ctx.shadowColor='#19e8ff';ctx.shadowBlur=10;ctx.fillStyle='#bffcff';
+  for(const s of shots){ctx.fillRect(s.x-2,s.y-12,4,16);}ctx.shadowBlur=0;
+  // 戰機
+  const alive=gtime>=ship.deadUntil;
+  if(alive&&(gtime>=ship.invUntil||Math.floor(gtime*10)%2===0)){
+    ctx.save();ctx.translate(ship.x,ship.y);
+    ctx.shadowColor='#19e8ff';ctx.shadowBlur=18;
+    // 引擎焰
+    ctx.fillStyle=`rgba(255,${150+rnd(0,80)},40,.9)`;
+    ctx.beginPath();ctx.moveTo(-6,14);ctx.lineTo(0,26+Math.random()*10);ctx.lineTo(6,14);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#19e8ff';
+    ctx.beginPath();ctx.moveTo(0,-20);ctx.lineTo(-16,14);ctx.lineTo(-5,8);ctx.lineTo(0,14);ctx.lineTo(5,8);ctx.lineTo(16,14);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#0a2a3a';ctx.beginPath();ctx.ellipse(0,-4,4,9,0,0,7);ctx.fill();
+    ctx.restore();ctx.shadowBlur=0;
+  }
+  // 粒子
+  for(const p of parts){ctx.globalAlpha=Math.min(1,p.life*2);ctx.fillStyle=p.color;
+    ctx.fillRect(p.x-2,p.y-2,4,4);}ctx.globalAlpha=1;
+  // 浮字
+  ctx.font='bold 17px "Segoe UI",sans-serif';
+  for(const f of floats){ctx.globalAlpha=Math.min(1,f.life);ctx.fillStyle=f.color;
+    ctx.shadowColor=f.color;ctx.shadowBlur=10;ctx.fillText(f.text,f.x,f.y);}
+  ctx.globalAlpha=1;ctx.shadowBlur=0;
+
+  // HUD
+  ctx.textAlign='left';ctx.font='bold 15px "Segoe UI",sans-serif';
+  const mm=Math.max(0,Math.floor(timeLeft/60)),ss=Math.max(0,Math.floor(timeLeft%60));
+  ctx.fillStyle=timeLeft<20?'#ff5f6d':'#bfe3ff';
+  ctx.fillText(`⏱ ${mm}:${ss<10?'0':''}${ss}`,12,24);
+  ctx.fillStyle='#ffe14f';ctx.fillText(`分數 ${score}`,12,46);
+  ctx.fillStyle=combo>=3?'#ff9a3d':'#bfe3ff';
+  ctx.fillText(`連擊 ×${combo}${combo>=3?' 🔥':''}`,12,68);
+  ctx.textAlign='right';ctx.fillStyle='#7dff9a';
+  ctx.fillText(`✓${nOK}  ✘${nNO}`,W-12,24);
+
+  // 系統離線
+  if(gtime<offlineUntil){
+    ctx.fillStyle='rgba(255,20,40,.14)';ctx.fillRect(0,0,W,H);
+    ctx.textAlign='center';ctx.font='bold 26px "Segoe UI",sans-serif';
+    ctx.fillStyle='#ff5f6d';ctx.shadowColor='#ff5f6d';ctx.shadowBlur=20;
+    ctx.fillText(`⚠ 系統離線 ${(offlineUntil-gtime).toFixed(1)}s ⚠`,W/2,H/2);
+    ctx.shadowBlur=0;
+  }
+  // 重生提示
+  if(!alive){ctx.textAlign='center';ctx.font='bold 24px "Segoe UI",sans-serif';
+    ctx.fillStyle='#ffb14f';ctx.shadowColor='#ffb14f';ctx.shadowBlur=18;
+    ctx.fillText('💥 墜毀！重新出擊…',W/2,H/2+40);ctx.shadowBlur=0;}
+}
+function pick2(h,arr){return arr[Math.floor(h*arr.length)%arr.length];}
+
+/* ================= 流程 ================= */
+function startGame(){
+  score=0;combo=0;bestCombo=0;nOK=0;nNO=0;gtime=0;timeLeft=180;
+  offlineUntil=0;shots=[];parts=[];floats=[];drones=[];
+  scrollY=0;buildWalls();ship.x=W/2;ship.deadUntil=0;ship.invUntil=gtime+2;
+  spawnWave();state='playing';
+  $('menu').classList.add('hidden');$('results').classList.add('hidden');$('pause').classList.add('hidden');
+}
+function endGame(){
+  state='over';firing=false;
+  $('rScore').textContent=score;$('rOk').textContent=nOK;$('rNo').textContent=nNO;
+  $('rAcc').textContent=(nOK+nNO)?Math.round(nOK/(nOK+nNO)*100)+'%':'—';
+  $('rCombo').textContent=bestCombo;
+  $('results').classList.remove('hidden');
+}
+function togglePause(){
+  if(state==='playing'){state='paused';$('pause').classList.remove('hidden');}
+  else if(state==='paused'){state='playing';$('pause').classList.add('hidden');}
+}
+
+/* ================= 輸入 ================= */
+addEventListener('keydown',e=>{
+  if([' ','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))e.preventDefault();
+  keys[e.key]=true;
+  if(e.key===' ')firing=true;
+  if(e.key==='Shift')boost=true;
+  if((e.key==='p'||e.key==='P'||e.key==='Escape')&&(state==='playing'||state==='paused'))togglePause();
+});
+addEventListener('keyup',e=>{keys[e.key]=false;
+  if(e.key===' ')firing=false;if(e.key==='Shift')boost=false;});
+cv.addEventListener('mousemove',e=>{mouseX=e.clientX;});
+cv.addEventListener('mousedown',()=>{if(state==='playing')firing=true;});
+addEventListener('mouseup',()=>{if(!touchMode)firing=false;});
+let touchMode=false;
+cv.addEventListener('touchstart',e=>{touchMode=true;e.preventDefault();
+  touchTarget=e.touches[0].clientX;},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();touchTarget=e.touches[0].clientX;},{passive:false});
+cv.addEventListener('touchend',e=>{if(!e.touches.length)touchTarget=null;});
+function bindBtn(id,down,up){const el=$(id);
+  el.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();down();},{passive:false});
+  el.addEventListener('touchend',e=>{e.preventDefault();if(up)up();},{passive:false});
+  el.addEventListener('mousedown',e=>{e.stopPropagation();down();});
+  el.addEventListener('mouseup',()=>{if(up)up();});}
+bindBtn('btnFire',()=>{if(state==='playing')firing=true;},()=>firing=false);
+bindBtn('btnBoost',()=>boost=true,()=>boost=false);
+bindBtn('btnPause',()=>{if(state==='playing'||state==='paused')togglePause();});
+
+/* ================= 選單 ================= */
+$('topicList').addEventListener('click',e=>{
+  const b=e.target.closest('.topic-btn');if(!b)return;
+  document.querySelectorAll('.topic-btn').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel');topic=b.dataset.t;});
+$('startBtn').onclick=startGame;
+$('againBtn').onclick=startGame;
+$('menuBtn').onclick=()=>{$('results').classList.add('hidden');$('menu').classList.remove('hidden');state='menu';};
+$('resumeBtn').onclick=togglePause;
+$('quitBtn').onclick=()=>{$('pause').classList.add('hidden');$('menu').classList.remove('hidden');state='menu';};
+
+/* ================= 主迴圈 ================= */
+let last=performance.now();
+function loop(ts){
+  requestAnimationFrame(loop);
+  const dt=Math.min((ts-last)/1000,0.05);last=ts;
+  if(state==='playing')update(dt);
+  else if(state==='menu'){scrollY+=60*dt;if(scrollY>=SEG){scrollY-=SEG;wallSegs.shift();pushSeg();}
+    for(const r of rain){r.y+=r.v*dt;if(r.y>H){r.y=-20;r.x=Math.random()*W;}}}
+  render();
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
